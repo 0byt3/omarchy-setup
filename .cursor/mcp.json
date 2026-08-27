@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "nushell": {
+      "command": "nu",
+      "args": ["--no-config-file", "--mcp", "--mcp-transport", "stdio"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp", "--transport", "stdio"]
+    }
+  }
+}

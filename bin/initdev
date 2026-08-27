@@ -1,0 +1,215 @@
+#!/usr/bin/env nu
+
+const DEVCONTAINER_FEATURES = [
+    {
+        name: "docker in docker"
+        feature: "ghcr.io/devcontainers/features/docker-in-docker:2"
+        run_arg: "--privileged"
+        post_create_command: "sh -c 'if grep -qw \"^nf_tables\" /proc/modules 2>/dev/null || modprobe -n nf_tables >/dev/null 2>&1; then update-alternatives --set iptables /usr/sbin/iptables-nft 2>/dev/null || true; fi'"
+    }
+    {
+        name: "python"
+        feature: "ghcr.io/devcontainers/features/python:1"
+    }
+    {
+        name: "powershell"
+        feature: "ghcr.io/devcontainers/features/powershell:2"
+    }
+]
+
+def config-dir []: nothing -> string {
+    $nu.home-dir | path join ".config" "initdev"
+}
+
+def load-mcp-templates [mcp_dir: string]: nothing -> record {
+    if not ($mcp_dir | path exists) {
+        return {}
+    }
+    glob ($mcp_dir | path join "*.json")
+    | sort
+    | reduce --fold {} {|file, acc|
+        try {
+            $acc | insert ($file | path parse | get stem) (open $file)
+        } catch {
+            $acc
+        }
+    }
+}
+
+def load-existing-mcp-config [mcp_path: string]: nothing -> record {
+    if not ($mcp_path | path exists) {
+        return {}
+    }
+    try {
+        open $mcp_path | get -o mcpServers | default {}
+    } catch {
+        {}
+    }
+}
+
+def save-mcp-config [
+    mcp_path: string
+    existing: record
+    templates: record
+    selected: list<string>
+] {
+    let template_names = ($templates | columns)
+    mut servers = ($existing | columns | reduce --fold {} {|k, acc|
+        if $k not-in $template_names {
+            $acc | insert $k ($existing | get $k)
+        } else {
+            $acc
+        }
+    })
+    for name in $selected {
+        $servers = ($servers | upsert $name ($templates | get $name))
+    }
+    mkdir ($mcp_path | path dirname)
+    { mcpServers: $servers } | to json --indent 2 | $in + "\n" | save -f $mcp_path
+}
+
+def apply-features [devcontainer_path: string, selected: list<string>] {
+    mut data = try { open $devcontainer_path } catch { return }
+    if ($data | is-empty) { return }
+
+    mut features = ($data | get -o features | default {})
+    mut run_args = ($data | get -o runArgs | default [])
+    mut post_cmds: list<string> = []
+
+    for name in $selected {
+        let matches = ($DEVCONTAINER_FEATURES | where name == $name)
+        if ($matches | is-empty) { continue }
+        let cfg = ($matches | first)
+        let opts = ($cfg | get -o options | default {})
+        $features = ($features | upsert $cfg.feature $opts)
+        let run_arg = ($cfg | get -o run_arg)
+        if $run_arg != null and $run_arg not-in $run_args {
+            $run_args = ($run_args | append $run_arg)
+        }
+        let cmd = ($cfg | get -o post_create_command)
+        if $cmd != null {
+            $post_cmds = ($post_cmds | append $cmd)
+        }
+    }
+
+    $data = ($data | upsert features $features | upsert runArgs $run_args)
+
+    if not ($post_cmds | is-empty) {
+        let existing_cmd = ($data | get -o postCreateCommand)
+        let merged = if ($existing_cmd | describe | str starts-with "list") {
+            [...$post_cmds, ...$existing_cmd]
+        } else if $existing_cmd != null {
+            [...$post_cmds, $existing_cmd]
+        } else if ($post_cmds | length) == 1 {
+            $post_cmds | first
+        } else {
+            $post_cmds
+        }
+        $data = ($data | upsert postCreateCommand $merged)
+    }
+
+    $data | to json --indent 2 | $in + "\n" | save -f $devcontainer_path
+}
+
+def gum-choose [header: string, names: list<string>, pre_selected: list<string>]: nothing -> list<string> {
+    let result = if ($pre_selected | is-empty) {
+        ^gum choose --no-limit --ordered --header $header ...$names
+    } else {
+        ^gum choose --no-limit --ordered --header $header $"--selected=($pre_selected | str join ',')" ...$names
+    }
+    $result | lines | where { $in != "" }
+}
+
+def configure-features [] {
+    let devcontainer_path = ($env.PWD | path join ".devcontainer" "devcontainer.json")
+    if not ($devcontainer_path | path exists) { return }
+
+    let names = ($DEVCONTAINER_FEATURES | get name)
+    let data = try { open $devcontainer_path } catch { return }
+    let features = ($data | get -o features | default {})
+    let run_args = ($data | get -o runArgs | default [])
+
+    let active = ($names | where {|name|
+        let cfg = ($DEVCONTAINER_FEATURES | where name == $name | first)
+        let run_arg = ($cfg | get -o run_arg)
+        ($cfg.feature in ($features | columns)) and ($run_arg == null or $run_arg in $run_args)
+    })
+
+    let selected = try { gum-choose "Select dev container features" $names $active } catch { return }
+    apply-features $devcontainer_path $selected
+}
+
+def configure-mcp [] {
+    let mcp_path = ($env.PWD | path join ".cursor" "mcp.json")
+    let template_dir = (config-dir | path join "MCP")
+    let templates = (load-mcp-templates $template_dir)
+
+    if ($templates | is-empty) {
+        print $"(ansi red)■(ansi reset)  No MCP server templates found in ($template_dir)."
+        return
+    }
+
+    let existing = (load-existing-mcp-config $mcp_path)
+    let names = ($templates | columns)
+    let active = ($names | where {|name| $name in ($existing | columns)})
+
+    let selected = try { gum-choose "Select MCP servers" $names $active } catch { return }
+    save-mcp-config $mcp_path $existing $templates $selected
+}
+
+# Scaffold a dev container and configure features and MCP servers
+def "main container" [] {
+    ## devcontainer config uses cursor, nushell and powershell dirs from $HOME/.config
+    # make sure they exist
+    ["cursor", "Cursor", "nushell", "powershell"]
+    | par-each {|name| (path join $nu.home-dir ".config" $name) }
+    | where {|dir| not ($dir | path exists) }
+    | par-each {|dir| mkdir $dir }
+
+    print $"(ansi dark_gray)┌(ansi reset)  (ansi attr_bold)initdev(ansi reset)"
+    print $"(ansi dark_gray)│(ansi reset)"
+
+    let devcontainer_dest = ($env.PWD | path join ".devcontainer")
+    if ($devcontainer_dest | path exists) {
+        print $"(ansi red)■(ansi reset)  .devcontainer directory already exists."
+        print $"(ansi dark_gray)│(ansi reset)"
+        print $"(ansi dark_gray)└(ansi reset)"
+        return
+    }
+
+    let template_dir = (config-dir | path join "devcontainer")
+    if not ($template_dir | path exists) {
+        print $"(ansi red)■(ansi reset)  Missing devcontainer directory in (config-dir)/"
+        print $"(ansi dark_gray)│(ansi reset)"
+        print $"(ansi dark_gray)└(ansi reset)"
+        exit 1
+    }
+
+    cp -r $template_dir .devcontainer
+    let deployed_config_path = $env.PWD | path join ".devcontainer" "devcontainer.json"
+    let deployed_config = open $deployed_config_path
+    $deployed_config | upsert name { $env.PWD | path basename } | save -f $deployed_config_path
+
+    print $"(ansi green)◇(ansi reset)  Initialized dev container configuration."
+    print $"(ansi dark_gray)│(ansi reset)"
+
+    configure-features
+    configure-mcp
+
+    print $"(ansi dark_gray)└(ansi reset)  (ansi attr_dimmed)Done.(ansi reset)"
+}
+
+# Configure MCP servers for the current project
+def "main mcp" [] {
+    print $"(ansi dark_gray)┌(ansi reset)  (ansi attr_bold)initdev(ansi reset)"
+    print $"(ansi dark_gray)│(ansi reset)"
+
+    configure-mcp
+
+    print $"(ansi dark_gray)└(ansi reset)  (ansi attr_dimmed)Done.(ansi reset)"
+}
+
+def main [] {
+    print -e "Usage: initdev <container|mcp>"
+    exit 1
+}

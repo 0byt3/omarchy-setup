@@ -1,0 +1,4 @@
+theme = "omarchy"
+
+[editor]
+line-number = "relative"

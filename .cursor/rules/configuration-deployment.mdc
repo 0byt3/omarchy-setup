@@ -1,0 +1,14 @@
+---
+description: Keep tool configurations isolated and deploy directories simply
+globs: deploy-configuration.nu
+alwaysApply: false
+---
+
+# Configuration deployment
+
+- Prefer one dedicated repository directory per configured tool. Keep that tool's configuration files together rather than scattering them across unrelated directories.
+- When a tool's configuration directory maps directly to its destination, deploy it by:
+  1. creating the destination directory if needed; then
+  2. copying the source directory's contents, including hidden files, into it.
+- Avoid individual file-copy commands when a directory copy produces the same result.
+- Use individual handling only when files require transformations, different destinations, generated content, or special permissions.

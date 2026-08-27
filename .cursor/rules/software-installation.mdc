@@ -1,0 +1,10 @@
+---
+description: Prefer Omarchy pacman tooling, then Flatpak, before requesting AUR use
+alwaysApply: true
+---
+
+# Software installation
+
+- Prefer Omarchy's pacman tooling for all software installation.
+- Use Flatpak when the software is unavailable through Omarchy's pacman tooling.
+- If the software is unavailable through both pacman and Flatpak, request permission before adding an AUR installation through Omarchy tooling.

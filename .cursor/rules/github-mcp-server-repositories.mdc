@@ -1,0 +1,9 @@
+---
+description: Store GitHub-sourced MCP server repositories in the local MCP directory
+globs: "{install-applications.nu,requirements.bash}"
+alwaysApply: false
+---
+
+# GitHub MCP server repositories
+
+- As the exception to the standard GitHub source location, clone GitHub-sourced MCP server projects into `~/.local/mcp/<server>`.

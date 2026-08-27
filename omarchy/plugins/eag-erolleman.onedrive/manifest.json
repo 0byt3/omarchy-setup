@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "eag-erolleman.onedrive",
+  "name": "OneDrive",
+  "version": "1.0.0",
+  "author": "eag-erolleman",
+  "description": "OneDrive monitor service status and synchronization activity",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "OneDrive",
+    "description": "View OneDrive service status and current synchronization activity",
+    "category": "Files",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

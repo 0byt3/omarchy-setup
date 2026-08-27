@@ -1,0 +1,10 @@
+---
+description: Prefer Nushell for project scripts and automation
+alwaysApply: true
+---
+
+# Nushell scripting
+
+- Prefer Nushell (`.nu`) for new project scripts and automation.
+- Follow an existing script's language when modifying it, unless the task includes a migration.
+- Use another language only when a required tool, runtime, or platform constraint makes Nushell unsuitable.

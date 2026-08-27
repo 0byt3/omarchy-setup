@@ -1,0 +1,19 @@
+---
+description: Prefer Nushell built-ins in Nushell scripts
+globs: "**/*.nu"
+alwaysApply: false
+---
+
+# Nushell built-ins
+
+- Prefer Nushell built-in commands over external commands when they provide the required behavior.
+- Use external commands only when no equivalent built-in exists or the external tool provides a required capability.
+- Preserve structured Nushell data rather than parsing text output unnecessarily.
+
+```nu
+# Prefer
+http get $url
+
+# Avoid when an equivalent built-in exists
+^curl $url
+```

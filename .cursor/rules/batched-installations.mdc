@@ -1,0 +1,11 @@
+---
+description: Batch software installations by installer
+globs: install-applications.nu
+alwaysApply: false
+---
+
+# Batched installations
+
+- First determine all missing packages for each installer.
+- For installers that support multiple packages, install each installer’s packages with one command rather than one command per package.
+- In particular, batch Omarchy package additions with one `omarchy pkg add` command and batch Flatpak installations with one `flatpak install` command.

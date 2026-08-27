@@ -1,0 +1,36 @@
+{
+    "name": "{name}",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".",
+    },
+    "containerEnv": {
+        "VSCODE_GIT_IPC_AUTH_TOKEN": "",
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "timonwong.shellcheck",
+                "vscodevim.vim",
+                "nushell.nushell",
+                "ms-vscode.powershell",
+            ],
+            "settings": {
+                "git.useIntegratedAskPass": false,
+            },
+        },
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.config/cursor,target=/home/vscode/.config/cursor,type=bind,ro,consistency=cached",
+        "source=${localEnv:HOME}/.config/Cursor,target=/home/vscode/.config/Cursor,type=bind,ro,consistency=cached",
+    ],
+    "remoteUser": "vscode",
+    "runArgs": ["--network=host"],
+    "postCreateCommand": [],
+    "features": {},
+
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,Z",
+    "workspaceFolder": "/workspace",
+}

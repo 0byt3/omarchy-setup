@@ -1,0 +1,11 @@
+---
+description: Manage GitHub-source installations from a persistent local checkout
+globs: "{install-applications.nu,requirements.bash}"
+alwaysApply: false
+---
+
+# GitHub-source installations
+
+- When a GitHub source directory does not yet exist, shallow-clone only the latest commit into `~/.local/share/<application>` and retain the checkout there. GitHub-sourced MCP servers are the exception: use `~/.local/mcp/<server>`.
+- On later runs, fetch and compare the checkout with its configured upstream before pulling updates.
+- Build and install after the initial clone, and rebuild and reinstall only when the source revision changes.
