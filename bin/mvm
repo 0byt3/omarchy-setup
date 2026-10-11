@@ -1,188 +1,167 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env nu
 
-readonly mvm_directory=".mvm"
-readonly config_label="mvm-config"
-
-usage() {
-    cat <<'EOF'
-Usage: mvm [-n NAME] [--replace] [--dry-run] [-- MSB_CREATE_ARGS...]
-
-Start a microsandbox VM from the YAML config files in ./.mvm.
-
-Config files (.yaml or .yml) map to msb create flags by name:
-  sandbox      --conf
-  resources    --resource-conf
-  runtime      --runtime-conf
-  fs           --fs-conf
-  network      --net-conf
-  secrets      --secret-conf
-  scripts      --script-conf
-Any other YAML file is passed with --conf after sandbox.yaml, in name order.
-Scoped files load after root files, so their values take precedence.
-Relative paths inside a config file resolve against .mvm, not the current path.
-
-An existing sandbox with the same name is started instead of recreated.
-
-Options:
-  -n, --name NAME  Sandbox name (default: current directory name)
-      --replace    Recreate the sandbox from the current config files
-      --dry-run    Print the msb create command without running it
-  -h, --help       Show this help
-
-Arguments after -- are passed to msb create.
-EOF
+const mvm_directory = ".mvm"
+const config_label = "mvm-config"
+const scoped_flags = {
+    resources: "--resource-conf"
+    runtime: "--runtime-conf"
+    fs: "--fs-conf"
+    network: "--net-conf"
+    secrets: "--secret-conf"
+    scripts: "--script-conf"
 }
 
-die() {
-    printf 'mvm: %s\n' "$1" >&2
-    exit 1
-}
+def config-files []: nothing -> table {
+    if ($mvm_directory | path type) != "dir" {
+        error make {msg: $"No ($mvm_directory) directory in ($env.PWD)."}
+    }
 
-sanitize_name() {
-    local name
-    name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
-    name="${name#-}"
-    name="${name%-}"
-    printf '%s' "${name:0:128}"
-}
-
-scoped_flag() {
-    case "$1" in
-        resources) echo "--resource-conf" ;;
-        runtime) echo "--runtime-conf" ;;
-        fs) echo "--fs-conf" ;;
-        network) echo "--net-conf" ;;
-        secrets) echo "--secret-conf" ;;
-        scripts) echo "--script-conf" ;;
-        *) return 1 ;;
-    esac
-}
-
-check_kvm_access() {
-    [[ "$(uname -s)" == "Linux" ]] || return 0
-
-    if [[ ! -e /dev/kvm ]]; then
-        die "/dev/kvm is missing; microsandbox requires KVM on Linux."
-    fi
-    if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
-        die "no read/write access to /dev/kvm; add $(id -un) to the $(stat -c '%G' /dev/kvm) group and log in again."
-    fi
-}
-
-list_contains() {
-    local name="$1" names
-    shift
-    names="$(msb list --quiet "$@")" || die "msb list failed."
-    grep -Fxq -- "${name}" <<<"${names}"
-}
-
-main() {
-    local name=""
-    local replace=false
-    local dry_run=false
-    local -a create_args=()
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -n | --name)
-                [[ $# -ge 2 ]] || die "$1 requires a value."
-                name="$2"
-                shift 2
-                ;;
-            --replace)
-                replace=true
-                shift
-                ;;
-            --dry-run)
-                dry_run=true
-                shift
-                ;;
-            -h | --help)
-                usage
-                return 0
-                ;;
-            --)
-                shift
-                create_args=("$@")
-                break
-                ;;
-            *)
-                usage >&2
-                die "unknown argument: $1"
-                ;;
-        esac
-    done
-
-    [[ -d "${mvm_directory}" ]] || die "no ${mvm_directory} directory in ${PWD}."
-
-    shopt -s nullglob
-    local -a config_files=("${mvm_directory}"/*.yaml "${mvm_directory}"/*.yml)
-    shopt -u nullglob
-    [[ ${#config_files[@]} -gt 0 ]] || die "no .yaml or .yml config files in ${mvm_directory}."
-
-    local -A seen=()
-    local -a sandbox_args=() root_args=() scoped_args=()
-    local file stem flag
-    for file in "${config_files[@]}"; do
-        stem="$(basename "${file}")"
-        stem="${stem%.*}"
-        if [[ -n "${seen[${stem}]:-}" ]]; then
-            die "both ${seen[${stem}]} and ${file} configure '${stem}'; keep one."
-        fi
-        seen["${stem}"]="${file}"
-
-        if [[ "${stem}" == "sandbox" ]]; then
-            sandbox_args=(--conf "${file}")
-        elif flag="$(scoped_flag "${stem}")"; then
-            scoped_args+=("${flag}" "${file}")
-        else
-            root_args+=(--conf "${file}")
-        fi
-    done
-
-    if [[ -z "${name}" ]]; then
-        name="$(sanitize_name "$(basename "${PWD}")")"
-        [[ -n "${name}" ]] || die "cannot derive a sandbox name from ${PWD}; pass --name."
-    fi
-
-    local config_hash
-    config_hash="$(sha256sum -- "${config_files[@]}" | sha256sum | cut -c1-16)"
-
-    local -a create_command=(
-        msb create
-        --name "${name}"
-        --label "${config_label}=${config_hash}"
+    let files = (
+        ls $mvm_directory
+        | where type == file and name =~ '\.ya?ml$'
+        | sort-by name
+        | each {|file| {path: $file.name, stem: ($file.name | path parse | get stem)} }
     )
-    if [[ "${replace}" == true ]]; then
-        create_command+=(--replace)
-    fi
-    create_command+=("${sandbox_args[@]}" "${root_args[@]}" "${scoped_args[@]}" "${create_args[@]}")
+    if ($files | is-empty) {
+        error make {msg: $"No .yaml or .yml config files in ($mvm_directory)."}
+    }
 
-    if [[ "${dry_run}" == true ]]; then
-        printf '%q ' "${create_command[@]}"
-        printf '\n'
-        return 0
-    fi
+    let duplicates = ($files | group-by stem | values | where ($it | length) > 1)
+    if not ($duplicates | is-empty) {
+        let paths = ($duplicates | first | get path | str join " and ")
+        error make {msg: $"($paths) configure the same file name; keep one."}
+    }
 
-    command -v msb >/dev/null || die "msb is not installed."
-    check_kvm_access
-
-    if [[ "${replace}" == false ]] && list_contains "${name}"; then
-        if [[ ${#create_args[@]} -gt 0 ]]; then
-            printf 'mvm: ignoring msb create arguments because sandbox %s already exists; use --replace to apply them.\n' "${name}" >&2
-        fi
-        if ! list_contains "${name}" --label "${config_label}=${config_hash}"; then
-            printf 'mvm: %s config files changed since sandbox %s was created; run mvm --replace to recreate it.\n' "${mvm_directory}" "${name}" >&2
-        fi
-        if list_contains "${name}" --running; then
-            printf 'Sandbox %s is already running.\n' "${name}"
-            return 0
-        fi
-        exec msb start "${name}"
-    fi
-
-    exec "${create_command[@]}"
+    $files
 }
 
-main "$@"
+def config-arguments [files: table]: nothing -> list<string> {
+    let sandbox = ($files | where stem == "sandbox")
+    let scoped = ($files | where stem in ($scoped_flags | columns))
+    let root = ($files | where stem != "sandbox" and stem not-in ($scoped_flags | columns))
+
+    [
+        ...($sandbox | each {|file| [--conf $file.path] } | flatten)
+        ...($root | each {|file| [--conf $file.path] } | flatten)
+        ...($scoped | each {|file| [($scoped_flags | get $file.stem) $file.path] } | flatten)
+    ]
+}
+
+def config-hash [files: table]: nothing -> string {
+    $files
+    | each {|file| $"(open --raw $file.path | hash sha256)  ($file.path)" }
+    | str join (char newline)
+    | hash sha256
+    | str substring 0..<16
+}
+
+def sanitize-name [name: string]: nothing -> string {
+    $name
+    | str lowercase
+    | str replace --all --regex '[^a-z0-9-]+' '-'
+    | str trim --char '-'
+    | str substring 0..<128
+}
+
+def shell-quote [argument: string]: nothing -> string {
+    if $argument =~ '^[A-Za-z0-9_./=:@%+,-]+$' {
+        $argument
+    } else {
+        $"'($argument | str replace --all "'" "'\\''")'"
+    }
+}
+
+def check-kvm-access [] {
+    if $nu.os-info.name != "linux" {
+        return
+    }
+
+    if not ("/dev/kvm" | path exists) {
+        error make {msg: "/dev/kvm is missing; microsandbox requires KVM on Linux."}
+    }
+    if (^test -r /dev/kvm -a -w /dev/kvm | complete).exit_code != 0 {
+        let group = (ls -l /dev/kvm | first | get group)
+        error make {msg: $"No read/write access to /dev/kvm; add (^id -un) to the ($group) group and log in again."}
+    }
+}
+
+def sandbox-listed [name: string, filters: list<string> = []]: nothing -> bool {
+    let result = (^msb list --quiet ...$filters | complete)
+    if $result.exit_code != 0 {
+        error make {msg: $"msb list failed: ($result.stderr | str trim)"}
+    }
+
+    $name in ($result.stdout | lines)
+}
+
+# Start a microsandbox VM from the YAML config files in ./.mvm.
+#
+# Config files (.yaml or .yml) map to msb create flags by file name:
+#   sandbox      --conf
+#   resources    --resource-conf
+#   runtime      --runtime-conf
+#   fs           --fs-conf
+#   network      --net-conf
+#   secrets      --secret-conf
+#   scripts      --script-conf
+# Any other YAML file is passed with --conf after sandbox.yaml, in name order.
+# Scoped files load after root files, so their values take precedence.
+# Relative paths inside a config file resolve against .mvm, not the current path.
+#
+# An existing sandbox with the same name is started instead of recreated.
+# msb create and msb start return once the VM boots; the VM keeps running in the background.
+# Arguments after -- are passed to msb create.
+def main [
+    --name (-n): string # Sandbox name (default: current directory name)
+    --replace # Recreate the sandbox from the current config files
+    --dry-run # Print the msb create command without running it
+    ...create_args: string # Arguments passed to msb create after --
+] {
+    let files = (config-files)
+
+    let name = if $name == null {
+        let derived = (sanitize-name ($env.PWD | path basename))
+        if ($derived | is-empty) {
+            error make {msg: $"Cannot derive a sandbox name from ($env.PWD); pass --name."}
+        }
+        $derived
+    } else {
+        $name
+    }
+
+    let hash = (config-hash $files)
+    let create_command = [
+        msb create
+        --name $name
+        --label $"($config_label)=($hash)"
+        ...(if $replace { [--replace] } else { [] })
+        ...(config-arguments $files)
+        ...$create_args
+    ]
+
+    if $dry_run {
+        print ($create_command | each {|argument| shell-quote $argument } | str join " ")
+        return
+    }
+
+    if (which msb | is-empty) {
+        error make {msg: "msb is not installed."}
+    }
+    check-kvm-access
+
+    if (not $replace) and (sandbox-listed $name) {
+        if not ($create_args | is-empty) {
+            print -e $"mvm: ignoring msb create arguments because sandbox ($name) already exists; use --replace to apply them."
+        }
+        if not (sandbox-listed $name [--label $"($config_label)=($hash)"]) {
+            print -e $"mvm: ($mvm_directory) config files changed since sandbox ($name) was created; run mvm --replace to recreate it."
+        }
+        if (sandbox-listed $name [--running]) {
+            print $"Sandbox ($name) is already running."
+            return
+        }
+        exec msb start $name
+    }
+
+    exec ...$create_command
+}
