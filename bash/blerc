@@ -1,0 +1,15 @@
+# ble.sh configuration deployed by deploy-configuration.nu.
+# Show the newest matching history entry as you type.
+bleopt complete_auto_history=1
+
+# True-color terminals use gray 245. A 256-color terminal uses color 103
+# (#8787af), the nearest palette color to this theme's dim foreground.
+if [[ ${blesh_color_mode-} == truecolor ]]; then
+    ble-face -s auto_complete fg=245
+elif [[ ${blesh_color_mode-} == 256 ]]; then
+    ble-face -s auto_complete fg=103
+fi
+
+# Omarchy login shells load bash-preexec before ~/.bashrc. This import lets
+# ble.sh own the line editor and still run those hooks.
+ble-import integration/bash-preexec

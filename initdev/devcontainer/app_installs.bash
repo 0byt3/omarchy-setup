@@ -2,29 +2,29 @@
 
 # install packages
 apt-get update \
-  && apt-get install -y \
-    fd-find \
-    fzf \
-    git \
-    jq \
-    openssh-client \
-    ripgrep
+    && apt-get install -y \
+        fd-find \
+        fzf \
+        git \
+        jq \
+        openssh-client \
+        ripgrep
 
 # Install yq (mikefarah/yq)
 ARCH_RAW=$(uname -m)
 case $ARCH_RAW in
-  x86_64)
-    ARCH="amd64"
-    C_ARCH="x64"
-    ;;
-  aarch64)
-    ARCH="arm64"
-    C_ARCH="arm64"
-    ;;
-  *)
-    echo "Unsupported architecture: ${ARCH_RAW}"
-    exit 1
-    ;;
+    x86_64)
+        ARCH="amd64"
+        C_ARCH="x64"
+        ;;
+    aarch64)
+        ARCH="arm64"
+        C_ARCH="arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: ${ARCH_RAW}"
+        exit 1
+        ;;
 esac
 
 # Install yq (mikefarah/yq)

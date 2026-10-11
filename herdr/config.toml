@@ -13,8 +13,7 @@ auto_switch = false
 panel_bg = "black"
 
 [terminal]
-# /etc/passwd stays on bash so scripts and non-interactive logins keep a POSIX shell.
-default_shell = "/usr/bin/nu"
+default_shell = "/usr/bin/bash"
 shell_mode = "login"
 
 # Matches -c "#{pane_current_path}" on every split, window, and session
@@ -24,9 +23,8 @@ new_cwd = "follow"
 prefix = "ctrl+space"
 
 # Config and help
-reload_config = "prefix+q"
 help = "prefix+?"
-detach = "prefix+d"
+detach = ["prefix+q", "prefix+d"]
 
 # Copy mode
 copy_mode = "prefix+["

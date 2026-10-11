@@ -20,7 +20,7 @@ hl.monitor({ output = "DP-2", mode = "3440x1440", position = "0x0", scale = 1.25
 hl.workspace_rule({ workspace = "0", monitor = "eDP-1", persistent = true })
 
 for workspace = 1, 13 do
-  hl.workspace_rule({ workspace = tostring(workspace), persistent = true })
+    hl.workspace_rule({ workspace = tostring(workspace), persistent = true })
 end
 
 

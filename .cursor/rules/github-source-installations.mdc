@@ -1,11 +1,16 @@
 ---
 description: Manage GitHub-source installations from a persistent local checkout
-globs: "{install-applications.nu,requirements.bash}"
+globs: "{install-applications.nu,requirements.bash,deploy-configuration.nu,neovim/plugins.nuon}"
 alwaysApply: false
 ---
 
 # GitHub-source installations
 
-- When a GitHub source directory does not yet exist, shallow-clone only the latest commit into `~/.local/share/<application>` and retain the checkout there. GitHub-sourced MCP servers are the exception: use `~/.local/mcp/<server>`.
-- On later runs, fetch and compare the checkout with its configured upstream before pulling updates.
+- When a GitHub source directory does not yet exist, shallow-clone only the latest commit into `~/.local/share/<application>` and retain the checkout there.
+- Exceptions:
+  - GitHub-sourced MCP servers: `~/.local/mcp/<server>`
+  - Neovim plugins: `~/.local/share/nvim/plugins/<plugin>`
+- On later runs, fetch and compare the checkout with its configured upstream before updating.
+- When the upstream revision has changed, reset the checkout to that revision. Do not fast-forward pull; shallow clones break when upstream history is rewritten.
 - Build and install after the initial clone, and rebuild and reinstall only when the source revision changes.
+- Neovim plugins are installed by replacing `~/.config/nvim/pack/external/start/<plugin>` from the checkout when the revision changes or the live plugin directory is missing.

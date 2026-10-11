@@ -1,0 +1,224 @@
+#!/usr/bin/env nu
+
+const pgadmin_container_name = "pgadmin4"
+const pgadmin_image = "dpage/pgadmin4"
+const pgadmin_listen_address = "127.0.0.1"
+const pgadmin_listen_port = 5050
+const pgadmin_container_port = 443
+const pgadmin_email = "erolleman@emilanderson.ca"
+
+def pgadmin-servers-file [] {
+    $env.HOME | path join ".local" "share" "pgadmin" "servers.json"
+}
+
+def pgadmin-certs-directory [] {
+    $env.HOME | path join ".local" "share" "pgadmin" "certs"
+}
+
+def ensure-pgadmin-certs [] {
+    let directory = (pgadmin-certs-directory)
+    let certificate = ($directory | path join "server.cert")
+    let key = ($directory | path join "server.key")
+
+    if not (($certificate | path exists) and ($key | path exists)) {
+        mkdir $directory
+        ^openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout $key -out $certificate -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+        ^chmod 644 $certificate $key
+    }
+
+    {certificate: $certificate, key: $key}
+}
+
+def prompt-pgadmin-password [] {
+    let password = (input --suppress-output "pgAdmin default password: " | str trim)
+    print ""
+
+    if ($password | is-empty) {
+        error make {msg: "pgAdmin password cannot be blank."}
+    }
+
+    $password
+}
+
+def pgadmin-servers-template [] {
+    {
+        Servers: {
+            "1": {
+                Name: "Local PostgreSQL"
+                Group: "Servers"
+                Host: "host.docker.internal"
+                Port: 5432
+                MaintenanceDB: "postgres"
+                Username: "postgres"
+                SSLMode: "prefer"
+            }
+        }
+    }
+}
+
+def save-pgadmin-servers [path: string, servers] {
+    $servers
+    | to json
+    | $in + (char newline)
+    | save --force $path
+}
+
+def ensure-pgadmin-servers-file [] {
+    let path = (pgadmin-servers-file)
+
+    if not ($path | path exists) {
+        mkdir ($path | path dirname)
+        save-pgadmin-servers $path (pgadmin-servers-template)
+        return $path
+    }
+
+    let current = (open $path)
+    let host = ($current | get -o Servers."1".Host | default "")
+    if $host == "127.0.0.1" {
+        save-pgadmin-servers $path ($current | upsert Servers."1".Host "host.docker.internal")
+    }
+
+    $path
+}
+
+def complete-docker [args: list<string>] {
+    let probe = (^docker info | complete)
+    if $probe.exit_code == 0 {
+        ^docker ...$args | complete
+    } else {
+        ^sudo docker ...$args | complete
+    }
+}
+
+def run-docker [args: list<string>] {
+    let probe = (^docker info | complete)
+    if $probe.exit_code == 0 {
+        ^docker ...$args
+    } else {
+        ^sudo docker ...$args
+    }
+}
+
+def pgadmin-container-inspect [] {
+    let result = (complete-docker [inspect $pgadmin_container_name])
+    if $result.exit_code != 0 {
+        null
+    } else {
+        $result.stdout | from json | first
+    }
+}
+
+def pgadmin-container-status [] {
+    let inspect = (pgadmin-container-inspect)
+    if $inspect == null {
+        "missing"
+    } else {
+        $inspect | get State.Status
+    }
+}
+
+def pgadmin-env-value [inspect, key: string] {
+    let matches = (
+        $inspect.Config.Env
+        | parse "{key}={value}"
+        | where key == $key
+    )
+
+    if ($matches | is-empty) {
+        null
+    } else {
+        $matches | get value | first
+    }
+}
+
+def pgadmin-has-expected-ports [inspect] {
+    let bindings = ($inspect.HostConfig.PortBindings | default {})
+    let mapped = try {
+        $bindings | get $"($pgadmin_container_port)/tcp"
+    } catch {
+        []
+    }
+
+    $mapped | any {|binding|
+        ($binding.HostIp == $pgadmin_listen_address) and (($binding.HostPort | into int) == $pgadmin_listen_port)
+    }
+}
+
+def run-pgadmin-container [password: string] {
+    let servers_path = (ensure-pgadmin-servers-file)
+    let certs = (ensure-pgadmin-certs)
+    let args = [
+        "run"
+        "--detach"
+        "--restart" "unless-stopped"
+        "--name" $pgadmin_container_name
+        "--publish" $"($pgadmin_listen_address):($pgadmin_listen_port):($pgadmin_container_port)"
+        "--add-host" "host.docker.internal:host-gateway"
+        "--env" $"PGADMIN_DEFAULT_EMAIL=($pgadmin_email)"
+        "--env" $"PGADMIN_DEFAULT_PASSWORD=($password)"
+        "--env" "PGADMIN_DISABLE_POSTFIX=True"
+        "--env" "PGADMIN_ENABLE_TLS=True"
+        "--volume" "pgadmin4-data:/var/lib/pgadmin"
+        "--volume" $"($servers_path):/pgadmin4/servers.json:ro"
+        "--volume" $"($certs.certificate):/certs/server.cert:ro"
+        "--volume" $"($certs.key):/certs/server.key:ro"
+        $pgadmin_image
+    ]
+
+    run-docker $args
+    print $"pgAdmin is available at https://($pgadmin_listen_address):($pgadmin_listen_port)"
+    print $"Login with ($pgadmin_email)"
+}
+
+def create-pgadmin-container [] {
+    run-pgadmin-container (prompt-pgadmin-password)
+}
+
+def recreate-pgadmin-container [inspect] {
+    let existing_password = (pgadmin-env-value $inspect "PGADMIN_DEFAULT_PASSWORD")
+    let password = if ($existing_password | is-empty) {
+        prompt-pgadmin-password
+    } else {
+        $existing_password
+    }
+
+    print "Recreating the pgAdmin container with host port mappings."
+    run-docker [rm --force $pgadmin_container_name]
+    run-pgadmin-container $password
+}
+
+# Start the pgAdmin container, creating it on first use.
+def "main start" [] {
+    let inspect = (pgadmin-container-inspect)
+    if $inspect == null {
+        create-pgadmin-container
+        return
+    }
+
+    if not (pgadmin-has-expected-ports $inspect) {
+        recreate-pgadmin-container $inspect
+        return
+    }
+
+    match ($inspect | get State.Status) {
+        "running" => { print "The pgAdmin container is already running." }
+        _ => { run-docker [start $pgadmin_container_name] }
+    }
+}
+
+# Stop the pgAdmin container.
+def "main stop" [] {
+    match (pgadmin-container-status) {
+        "missing" => {
+            error make {msg: $"The pgAdmin container ($pgadmin_container_name) does not exist."}
+        }
+        "running" => { run-docker [stop $pgadmin_container_name] }
+        $status => { print $"The pgAdmin container is not running (status: ($status))." }
+    }
+}
+
+# Manage the local pgAdmin Docker container.
+def main [] {
+    print -e "Usage: pgadminc <start|stop>"
+    exit 1
+}
