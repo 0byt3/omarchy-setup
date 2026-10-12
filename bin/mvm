@@ -167,6 +167,7 @@ def sandbox-listed [name: string, filters: list<string> = []]: nothing -> bool {
 # Scripts named setup and setup-* run once, in name order, after the sandbox is created;
 # a failed setup runs again on the next mvm. Scripts named start-* run, in name order,
 # each time mvm boots the sandbox. `initdev mvm` adds these scripts for selected features.
+#
 # Arguments after -- are passed to msb create.
 #
 # Use --shell to open an interactive shell inside the VM at /workspace.
