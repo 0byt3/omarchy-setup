@@ -1280,7 +1280,11 @@ def main [--yes] {
     ]
 
     let installed_pacman_packages = (^pacman -Qq | lines)
-    let installed_flatpak_packages = (^flatpak list --app --columns=application | lines)
+    let installed_flatpak_packages = if (which flatpak | is-empty) {
+        []
+    } else {
+        ^flatpak list --app --columns=application | lines
+    }
     let installed_powershell_modules = (installed-powershell-gallery-modules)
     let powershell_updates = (pending-powershell-updates)
     let powershell_editor_services_updates = (pending-powershell-editor-services-updates)
