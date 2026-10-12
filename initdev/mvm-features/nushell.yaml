@@ -1,0 +1,9 @@
+setup: |
+  set -e
+  arch="$(uname -m)"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/nushell/nushell/releases/latest)"
+  version="$(basename "$tag")"
+  archive="nu-$version-$arch-unknown-linux-gnu"
+  curl -fsSL "https://github.com/nushell/nushell/releases/download/$version/$archive.tar.gz" | tar -xz -C /tmp
+  install -m 0755 "/tmp/$archive/nu" /usr/local/bin/nu
+  rm -rf "/tmp/$archive"

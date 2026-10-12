@@ -1,0 +1,24 @@
+setup: |
+  set -e
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get install -y --no-install-recommends docker.io docker-buildx docker-compose-v2 e2fsprogs iptables
+  if [ ! -e /var/lib/docker.img ]; then
+    truncate -s 24G /var/lib/docker.img
+    mkfs.ext4 -q -F /var/lib/docker.img
+  fi
+start: |
+  set -e
+  mkdir -p /var/lib/docker
+  mountpoint -q /var/lib/docker || mount -o loop /var/lib/docker.img /var/lib/docker
+  if ! pgrep -x dockerd >/dev/null; then
+    setsid dockerd >/var/log/dockerd.log 2>&1 </dev/null &
+  fi
+  attempts=0
+  until docker info >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 30 ]; then
+      echo "dockerd did not start; see /var/log/dockerd.log" >&2
+      exit 1
+    fi
+    sleep 1
+  done
