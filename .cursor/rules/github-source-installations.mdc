@@ -1,6 +1,6 @@
 ---
 description: Manage GitHub-source installations from a persistent local checkout
-globs: "{install-applications.nu,requirements.bash,deploy-configuration.nu,neovim/plugins.nuon}"
+globs: "{install-applications.nu,install-mcp.nu,requirements.bash,deploy-configuration.nu,neovim/plugins.nuon}"
 alwaysApply: false
 ---
 

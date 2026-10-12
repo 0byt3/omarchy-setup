@@ -1,6 +1,6 @@
 ---
 description: Store GitHub-sourced MCP server repositories in the local MCP directory
-globs: "{install-applications.nu,requirements.bash}"
+globs: "{install-applications.nu,install-mcp.nu,requirements.bash}"
 alwaysApply: false
 ---
 

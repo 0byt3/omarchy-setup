@@ -1,9 +1,9 @@
 ---
 description: Require approval before adding npm or npx installations
-globs: install-applications.nu
+globs: "{install-applications.nu,install-mcp.nu}"
 alwaysApply: false
 ---
 
 # npm and npx installations
 
-- Request permission before adding an `npm` or `npx` installation command to `install-applications.nu`.
+- Request permission before adding an `npm` or `npx` installation command to `install-applications.nu` or `install-mcp.nu`.
