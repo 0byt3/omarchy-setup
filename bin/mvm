@@ -96,6 +96,8 @@ def sandbox-listed [name: string, filters: list<string> = []]: nothing -> bool {
 
 # Start a microsandbox VM from the YAML config files in ./.mvm.
 #
+# The current directory is mounted to /workspace inside the VM.
+#
 # Config files (.yaml or .yml) map to msb create flags by file name:
 #   sandbox      --conf
 #   resources    --resource-conf
@@ -134,6 +136,7 @@ def main [
         msb create
         --name $name
         --label $"($config_label)=($hash)"
+        --volume $"($env.PWD):/workspace"
         ...(if $replace { [--replace] } else { [] })
         ...(config-arguments $files)
         ...$create_args
