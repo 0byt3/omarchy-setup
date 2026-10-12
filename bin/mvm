@@ -113,9 +113,12 @@ def sandbox-listed [name: string, filters: list<string> = []]: nothing -> bool {
 # An existing sandbox with the same name is started instead of recreated.
 # msb create and msb start return once the VM boots; the VM keeps running in the background.
 # Arguments after -- are passed to msb create.
+#
+# Use --shell to open an interactive shell inside the VM at /workspace.
 def main [
     --name (-n): string # Sandbox name (default: current directory name)
     --replace # Recreate the sandbox from the current config files
+    --shell (-s) # Open an interactive shell at /workspace after starting
     --dry-run # Print the msb create command without running it
     ...create_args: string # Arguments passed to msb create after --
 ] {
@@ -144,6 +147,9 @@ def main [
 
     if $dry_run {
         print ($create_command | each {|argument| shell-quote $argument } | str join " ")
+        if $shell {
+            print $"msb exec ($name) --workdir /workspace -- sh -l"
+        }
         return
     }
 
@@ -160,11 +166,26 @@ def main [
             print -e $"mvm: ($mvm_directory) config files changed since sandbox ($name) was created; run mvm --replace to recreate it."
         }
         if (sandbox-listed $name [--running]) {
-            print $"Sandbox ($name) is already running."
-            return
+            if not $shell {
+                print $"Sandbox ($name) is already running."
+                return
+            }
+        } else {
+            if $shell {
+                ^msb start $name
+            } else {
+                exec msb start $name
+            }
         }
-        exec msb start $name
+    } else {
+        if $shell {
+            run-external ...$create_command
+        } else {
+            exec ...$create_command
+        }
     }
 
-    exec ...$create_command
+    if $shell {
+        exec msb exec $name --workdir /workspace -- sh -l
+    }
 }
