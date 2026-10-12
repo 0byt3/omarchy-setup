@@ -16,7 +16,7 @@ start: |
   attempts=0
   until docker info >/dev/null 2>&1; do
     attempts=$((attempts + 1))
-    if [ "${attempts}" -ge 30 ]; then
+    if [ "$attempts" -ge 30 ]; then
       echo "dockerd did not start; see /var/log/dockerd.log" >&2
       exit 1
     fi

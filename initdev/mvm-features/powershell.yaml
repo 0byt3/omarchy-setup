@@ -7,11 +7,11 @@ setup: |
     *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
   esac
   icu="$(apt-cache pkgnames libicu | grep -E '^libicu[0-9]+$' | sort -V | tail -n 1)"
-  apt-get install -y --no-install-recommends less locales "${icu}"
+  apt-get install -y --no-install-recommends less locales "$icu"
   tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/PowerShell/PowerShell/releases/latest)"
-  version="${tag##*/v}"
+  version="$(basename "$tag" | sed 's/^v//')"
   rm -rf /opt/microsoft/powershell
   mkdir -p /opt/microsoft/powershell
-  curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v${version}/powershell-${version}-linux-${arch}.tar.gz" | tar -xz -C /opt/microsoft/powershell
+  curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v$version/powershell-$version-linux-$arch.tar.gz" | tar -xz -C /opt/microsoft/powershell
   chmod +x /opt/microsoft/powershell/pwsh
   ln -sf /opt/microsoft/powershell/pwsh /usr/local/bin/pwsh

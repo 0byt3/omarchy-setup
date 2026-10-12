@@ -7,7 +7,7 @@ setup: |
   esac
   version="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -n 1)"
   rm -rf /usr/local/go
-  curl -fsSL "https://go.dev/dl/${version}.linux-${arch}.tar.gz" | tar -xz -C /usr/local
+  curl -fsSL "https://go.dev/dl/$version.linux-$arch.tar.gz" | tar -xz -C /usr/local
 env:
   GOPATH: "/root/go"
 path:
