@@ -24,6 +24,7 @@ The point of two separate scripts is such that deployment of configurations can 
 - Neovim: the pacman `neovim` and `omarchy-nvim` packages are removed, and the official GitHub nightly tarball is installed to `/opt/neovim`.
 - Topiary: the official GitHub release is installed to `~/.local/share/topiary`, with `topiary-nushell` queries cloned to `~/.local/share/topiary-nushell` and deployed to `~/.config/topiary`. It formats Nushell, Bash, JSON, and TOML.
 - Microsandbox: the official GitHub release is installed to `~/.microsandbox`, with `msb` and `microsandbox` linked in `~/.local/bin`. Local sandboxes require KVM.
+- `mvm`: a custom command that starts a microsandbox VM from the YAML config files in the current path's `.mvm` directory. `sandbox.yaml` and other files load with `--conf`; `resources`, `runtime`, `fs`, `network`, `secrets`, and `scripts` files load with the matching scoped flag. An existing sandbox is started, `mvm --replace` recreates it, and `mvm --dry-run` prints the `msb create` command.
 - PowerShell and PowerShell Editor Services.
 - MCP services: UniFi, Warehouse Explorer, Microsoft Graph, Nushell, and Playwright.
 - OneDrive: the abraunegg client is built from source with a monitor wrapper that exposes client status and synchronization events to the custom Omarchy OneDrive plugin.
