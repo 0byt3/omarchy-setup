@@ -2,6 +2,7 @@
 
 const mvm_directory = ".mvm"
 const config_label = "mvm-config"
+const setup_marker = "/var/lib/mvm/setup-done"
 const scoped_flags = {
     resources: "--resource-conf"
     runtime: "--runtime-conf"
@@ -71,6 +72,56 @@ def shell-quote [argument: string]: nothing -> string {
     }
 }
 
+def script-names [files: table]: nothing -> list<string> {
+    $files
+    | each {|file|
+        let data = try { open $file.path } catch { null }
+        if not ($data | describe | str starts-with "record") {
+            []
+        } else if $file.stem == "scripts" {
+            $data | columns
+        } else {
+            $data | get -o scripts | default {} | columns
+        }
+    }
+    | flatten
+    | uniq
+}
+
+def provision-command [scripts: list<string>, booted: bool]: nothing -> string {
+    let setup = ($scripts | where {|name| $name == "setup" or ($name | str starts-with "setup-") } | sort)
+    let start = if $booted {
+        $scripts | where {|name| $name | str starts-with "start-" } | sort
+    } else {
+        []
+    }
+    let run = {|name| $"echo (shell-quote $'mvm: running ($name)'); /.msb/scripts/(shell-quote $name)" }
+
+    [
+        ...(if ($setup | is-empty) { [] } else {
+            [
+                $"if [ ! -e ($setup_marker) ]; then"
+                ...($setup | each $run)
+                $"mkdir -p ($setup_marker | path dirname) && touch ($setup_marker)"
+                "fi"
+            ]
+        })
+        ...($start | each $run)
+    ]
+    | if ($in | is-empty) { "" } else { ["set -e" ...$in] | str join (char newline) }
+}
+
+def provision [name: string, command: string] {
+    if ($command | is-empty) {
+        return
+    }
+    try {
+        ^msb exec $name -- sh -c $command
+    } catch {
+        error make {msg: $"Provisioning sandbox ($name) failed; run mvm again to retry, or mvm --replace after fixing the ($mvm_directory) scripts."}
+    }
+}
+
 def check-kvm-access [] {
     if $nu.os-info.name != "linux" {
         return
@@ -112,6 +163,10 @@ def sandbox-listed [name: string, filters: list<string> = []]: nothing -> bool {
 #
 # An existing sandbox with the same name is started instead of recreated.
 # msb create and msb start return once the VM boots; the VM keeps running in the background.
+#
+# Scripts named setup and setup-* run once, in name order, after the sandbox is created;
+# a failed setup runs again on the next mvm. Scripts named start-* run, in name order,
+# each time mvm boots the sandbox. `initdev mvm` adds these scripts for selected features.
 # Arguments after -- are passed to msb create.
 #
 # Use --shell to open an interactive shell inside the VM at /workspace.
@@ -119,7 +174,7 @@ def main [
     --name (-n): string # Sandbox name (default: current directory name)
     --replace # Recreate the sandbox from the current config files
     --shell (-s) # Open an interactive shell at /workspace after starting
-    --dry-run # Print the msb create command without running it
+    --dry-run # Print the msb commands without running them
     ...create_args: string # Arguments passed to msb create after --
 ] {
     let files = (config-files)
@@ -145,8 +200,14 @@ def main [
         ...$create_args
     ]
 
+    let scripts = (script-names $files)
+
     if $dry_run {
         print ($create_command | each {|argument| shell-quote $argument } | str join " ")
+        let command = (provision-command $scripts true)
+        if not ($command | is-empty) {
+            print $"msb exec ($name) -- sh -c (shell-quote $command)"
+        }
         if $shell {
             print $"msb exec ($name) --workdir /workspace -- sh -l"
         }
@@ -158,7 +219,7 @@ def main [
     }
     check-kvm-access
 
-    if (not $replace) and (sandbox-listed $name) {
+    let booted = if (not $replace) and (sandbox-listed $name) {
         if not ($create_args | is-empty) {
             print -e $"mvm: ignoring msb create arguments because sandbox ($name) already exists; use --replace to apply them."
         }
@@ -166,26 +227,22 @@ def main [
             print -e $"mvm: ($mvm_directory) config files changed since sandbox ($name) was created; run mvm --replace to recreate it."
         }
         if (sandbox-listed $name [--running]) {
-            if not $shell {
-                print $"Sandbox ($name) is already running."
-                return
-            }
+            false
         } else {
-            if $shell {
-                ^msb start $name
-            } else {
-                exec msb start $name
-            }
+            ^msb start $name
+            true
         }
     } else {
-        if $shell {
-            run-external ...$create_command
-        } else {
-            exec ...$create_command
-        }
+        run-external ...$create_command
+        true
     }
+
+    provision $name (provision-command $scripts $booted)
 
     if $shell {
         exec msb exec $name --workdir /workspace -- sh -l
+    }
+    if not $booted {
+        print $"Sandbox ($name) is already running."
     }
 }

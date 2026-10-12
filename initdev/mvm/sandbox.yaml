@@ -1,0 +1,3 @@
+image:
+  oci: "ubuntu:24.04"
+  upper_size: "32G"

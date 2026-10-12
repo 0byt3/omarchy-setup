@@ -1,0 +1,12 @@
+setup: |
+  set -e
+  export DEBIAN_FRONTEND=noninteractive
+  icu="$(apt-cache pkgnames libicu | grep -E '^libicu[0-9]+$' | sort -V | tail -n 1)"
+  apt-get install -y --no-install-recommends libgcc-s1 libstdc++6 zlib1g "${icu}"
+  curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel LTS --install-dir /usr/local/dotnet
+env:
+  DOTNET_ROOT: "/usr/local/dotnet"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+path:
+  - "/usr/local/dotnet"
+  - "/root/.dotnet/tools"

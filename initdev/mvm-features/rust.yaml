@@ -1,0 +1,10 @@
+setup: |
+  set -e
+  export DEBIAN_FRONTEND=noninteractive RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo
+  apt-get install -y --no-install-recommends build-essential libssl-dev pkg-config
+  curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile default
+env:
+  RUSTUP_HOME: "/usr/local/rustup"
+  CARGO_HOME: "/usr/local/cargo"
+path:
+  - "/usr/local/cargo/bin"

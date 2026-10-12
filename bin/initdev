@@ -17,15 +17,17 @@ const DEVCONTAINER_FEATURES = [
     }
 ]
 
+const MVM_BASE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 def config-dir []: nothing -> string {
     $nu.home-dir | path join ".config" "initdev"
 }
 
-def load-mcp-templates [mcp_dir: string]: nothing -> record {
-    if not ($mcp_dir | path exists) {
+def load-templates [template_dir: string, extension: string]: nothing -> record {
+    if not ($template_dir | path exists) {
         return {}
     }
-    glob ($mcp_dir | path join "*.json")
+    glob ($template_dir | path join $"*.($extension)")
     | sort
     | reduce --fold {} {|file, acc|
         try {
@@ -142,7 +144,7 @@ def configure-features [] {
 def configure-mcp [] {
     let mcp_path = ($env.PWD | path join ".cursor" "mcp.json")
     let template_dir = (config-dir | path join "MCP")
-    let templates = (load-mcp-templates $template_dir)
+    let templates = (load-templates $template_dir "json")
 
     if ($templates | is-empty) {
         print $"(ansi red)■(ansi reset)  No MCP server templates found in ($template_dir)."
@@ -155,6 +157,117 @@ def configure-mcp [] {
 
     let selected = try { gum-choose "Select MCP servers" $names $active } catch { return }
     save-mcp-config $mcp_path $existing $templates $selected
+}
+
+def mvm-config-file [mvm_dir: string, stem: string]: nothing -> string {
+    let existing = (
+        ["yaml" "yml"]
+        | each {|extension| $mvm_dir | path join $"($stem).($extension)" }
+        | where ($it | path exists)
+    )
+    if ($existing | is-empty) {
+        $mvm_dir | path join $"($stem).yaml"
+    } else {
+        $existing | first
+    }
+}
+
+def open-yaml-record [path: string]: nothing -> record {
+    if not ($path | path exists) {
+        return {}
+    }
+    let data = try { open $path } catch {
+        error make {msg: $"Cannot parse ($path); fix it before configuring features."}
+    }
+    if $data == null {
+        return {}
+    }
+    if not ($data | describe | str starts-with "record") {
+        error make {msg: $"($path) must contain a YAML mapping."}
+    }
+    $data
+}
+
+def save-yaml-record [path: string, data: record] {
+    if ($data | is-empty) and not ($path | path exists) {
+        return
+    }
+    $data | to yaml | save -f $path
+}
+
+def apply-mvm-features [
+    mvm_dir: string
+    features: record
+    selected: list<string>
+    base_setup: any
+] {
+    let scripts_path = (mvm-config-file $mvm_dir "scripts")
+    let runtime_path = (mvm-config-file $mvm_dir "runtime")
+    let catalog = ($features | columns)
+    let chosen = ($catalog | where $it in $selected)
+    let managed_scripts = ($catalog | each {|name| [$"setup-($name)" $"start-($name)"] } | flatten)
+    let managed_env = ($features | values | each {|feature| $feature | get -o env | default {} | columns } | flatten)
+    let managed_paths = ($features | values | each {|feature| $feature | get -o path | default [] } | flatten)
+    let base_paths = ($MVM_BASE_PATH | split row ":")
+
+    mut scripts = (open-yaml-record $scripts_path | reject -o ...$managed_scripts)
+    if (not ($chosen | is-empty)) and ("setup" not-in ($scripts | columns)) and ($base_setup != null) {
+        $scripts = ({setup: $base_setup} | merge $scripts)
+    }
+    for name in $chosen {
+        let feature = ($features | get $name)
+        $scripts = ($scripts | insert $"setup-($name)" $feature.setup)
+        let start = ($feature | get -o start)
+        if $start != null {
+            $scripts = ($scripts | insert $"start-($name)" $start)
+        }
+    }
+    save-yaml-record $scripts_path $scripts
+
+    let runtime = (open-yaml-record $runtime_path)
+    mut variables = ($runtime | get -o env | default {} | reject -o ...$managed_env)
+    for name in $chosen {
+        $variables = ($variables | merge ($features | get $name | get -o env | default {}))
+    }
+    let user_paths = (
+        $variables
+        | get -o PATH
+        | default ""
+        | split row ":"
+        | where {|entry| $entry != "" and $entry not-in $managed_paths and $entry not-in $base_paths }
+    )
+    let feature_paths = ($chosen | each {|name| $features | get $name | get -o path | default [] } | flatten)
+    $variables = if ($feature_paths | is-empty) and ($user_paths | is-empty) {
+        $variables | reject -o PATH
+    } else {
+        $variables | upsert PATH ([...$feature_paths ...$user_paths ...$base_paths] | uniq | str join ":")
+    }
+    let updated_runtime = if ($variables | is-empty) {
+        $runtime | reject -o env
+    } else {
+        $runtime | upsert env $variables
+    }
+    save-yaml-record $runtime_path $updated_runtime
+}
+
+def configure-mvm-features [mvm_dir: string, template_dir: string, feature_dir: string] {
+    let features = (load-templates $feature_dir "yaml")
+    if ($features | is-empty) {
+        print $"(ansi red)■(ansi reset)  No microVM feature templates found in ($feature_dir)."
+        return
+    }
+
+    let scripts = (open-yaml-record (mvm-config-file $mvm_dir "scripts"))
+    let names = ($features | columns)
+    let active = ($names | where {|name| $"setup-($name)" in ($scripts | columns) })
+
+    let selected = try { gum-choose "Select microVM features" $names $active } catch { return }
+    let base_setup = (open-yaml-record ($template_dir | path join "scripts.yaml") | get -o setup)
+    apply-mvm-features $mvm_dir $features $selected $base_setup
+
+    print $"(ansi green)◇(ansi reset)  Configured microVM features: (if ($selected | is-empty) { 'none' } else { $selected | str join ', ' })."
+    print $"(ansi dark_gray)│(ansi reset)  Run (ansi attr_bold)mvm(ansi reset) to start the microVM, or (ansi attr_bold)mvm --replace(ansi reset) to rebuild an existing one."
+    print $"(ansi dark_gray)│(ansi reset)"
 }
 
 # Scaffold a dev container and configure features and MCP servers
@@ -209,7 +322,31 @@ def "main mcp" [] {
     print $"(ansi dark_gray)└(ansi reset)  (ansi attr_dimmed)Done.(ansi reset)"
 }
 
+# Scaffold a microVM configuration in .mvm and choose the tools to install
+def "main mvm" [] {
+    print $"(ansi dark_gray)┌(ansi reset)  (ansi attr_bold)initdev(ansi reset)"
+    print $"(ansi dark_gray)│(ansi reset)"
+
+    let mvm_dir = ($env.PWD | path join ".mvm")
+    let template_dir = (config-dir | path join "mvm")
+    if not ($mvm_dir | path exists) {
+        if not ($template_dir | path exists) {
+            print $"(ansi red)■(ansi reset)  Missing mvm directory in (config-dir)/"
+            print $"(ansi dark_gray)│(ansi reset)"
+            print $"(ansi dark_gray)└(ansi reset)"
+            exit 1
+        }
+        cp -r $template_dir $mvm_dir
+        print $"(ansi green)◇(ansi reset)  Initialized microVM configuration."
+        print $"(ansi dark_gray)│(ansi reset)"
+    }
+
+    configure-mvm-features $mvm_dir $template_dir (config-dir | path join "mvm-features")
+
+    print $"(ansi dark_gray)└(ansi reset)  (ansi attr_dimmed)Done.(ansi reset)"
+}
+
 def main [] {
-    print -e "Usage: initdev <container|mcp>"
+    print -e "Usage: initdev <container|mcp|mvm>"
     exit 1
 }

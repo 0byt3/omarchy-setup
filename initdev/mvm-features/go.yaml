@@ -1,0 +1,15 @@
+setup: |
+  set -e
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64) arch=arm64 ;;
+    *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+  esac
+  version="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -n 1)"
+  rm -rf /usr/local/go
+  curl -fsSL "https://go.dev/dl/${version}.linux-${arch}.tar.gz" | tar -xz -C /usr/local
+env:
+  GOPATH: "/root/go"
+path:
+  - "/usr/local/go/bin"
+  - "/root/go/bin"
