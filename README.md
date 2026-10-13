@@ -14,6 +14,8 @@ This project modifies a fresh Omarchy install for necessary customizations inclu
 
 Neovim configuration lives in `neovim/` and is deployed to `~/.config/nvim`. Plugins listed in `neovim/plugins.nuon` are cloned into `~/.local/share/nvim/plugins/<name>` and copied to `~/.config/nvim/pack/external/start/<name>` when the upstream revision changes. Treesitter parsers cover Bash, JSON, JSONL (via JSON), TOML, YAML, Markdown, Nushell, Odin, and Rust. Formatting uses Topiary for Nushell, Bash, JSON, and TOML, yamlfmt for YAML, mdformat for Markdown, jq for JSONL, odinfmt for Odin, and rustfmt for Rust. rust-analyzer provides Rust language-server support and runs Clippy for diagnostics.
 
+Shell aliases live in `bash/aliases.bash`, deployed to `~/.config/basic-cli/aliases.bash` and sourced from `~/.bashrc`, and in `nushell/autoload/aliases.nu`, deployed to `~/.config/nushell/autoload`. Both define `mdv` for `md-viewer`.
+
 The point of two separate scripts is such that deployment of configurations can happen independently of installation.
 
 ## Installed tools
