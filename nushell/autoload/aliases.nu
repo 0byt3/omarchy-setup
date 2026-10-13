@@ -1,1 +1,1 @@
-alias mdv = md-viewer
+alias mdv = md-view
