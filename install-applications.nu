@@ -892,8 +892,13 @@ def deploy-mvm [] {
 
 def deploy-mdpdf [] {
     let destination = ($env.HOME | path join ".local" "bin" "mdpdf")
+    let style_source = ($repository_directory | path join "bin" "mdpdf-style")
+    let style_destination = ($env.HOME | path join ".local" "share" "mdpdf")
+
     mkdir ($destination | path dirname)
+    mkdir $style_destination
     ^install --mode=0755 ($repository_directory | path join "bin" "mdpdf") $destination
+    ^cp --archive ...(glob $"($style_source)/*") $style_destination
 }
 
 def deploy-onedrive-plugin [] {
@@ -1265,6 +1270,7 @@ def main [--yes] {
         { package: "mdformat", source: "pkg" }
         { package: "mdformat-tables", source: "pkg" }
         { package: "pandoc-cli", source: "pkg" }
+        { package: "python-weasyprint", source: "pkg" }
         { package: "nodejs", source: "pkg" }
         { package: "npm", source: "pkg" }
         { package: "odin", source: "pkg" }
@@ -1279,7 +1285,6 @@ def main [--yes] {
         { package: "shellcheck", source: "pkg" }
         { package: "sqlite", source: "pkg" }
         { package: "tree-sitter-cli", source: "pkg" }
-        { package: "typst", source: "pkg" }
         { package: "yamlfmt", source: "pkg" }
         { package: "yamllint", source: "pkg" }
         { package: "Microsoft.Graph", source: "PSGallery" }

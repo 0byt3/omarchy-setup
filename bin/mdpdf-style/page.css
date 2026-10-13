@@ -1,0 +1,50 @@
+@page {
+  size: letter;
+  margin: 0.7in 0.75in;
+}
+
+.markdown-body {
+  max-width: none;
+  padding: 0;
+}
+
+.markdown-body .task-list {
+  padding-left: 0.2em;
+  list-style: none;
+}
+
+.markdown-body .task-list > li {
+  list-style: none;
+}
+
+.markdown-body .task-list li label {
+  display: inline;
+}
+
+.markdown-body .task-list input[type="checkbox"] {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin: 0 0.45em 0.1em 0;
+  vertical-align: middle;
+}
+
+.markdown-body del,
+.markdown-body s {
+  text-decoration: line-through;
+}
+
+@media print {
+  pre > code.sourceCode > span {
+    text-indent: 0;
+    padding-left: 0;
+  }
+}
+
+pre > code.sourceCode > span > a:first-child::before {
+  content: none;
+}
+
+.markdown-body div.sourceCode a[aria-hidden="true"] {
+  display: none;
+}

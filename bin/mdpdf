@@ -1,5 +1,7 @@
 #!/usr/bin/env nu
 
+const script_directory = path self | path dirname
+
 def pdf-alongside [markdown: string]: nothing -> string {
     $markdown | path parse | update extension "pdf" | path join
 }
@@ -10,10 +12,20 @@ def require-command [name: string] {
     }
 }
 
+def style-directory []: nothing -> string {
+    let beside_the_script = ($script_directory | path join "mdpdf-style")
+    if ($beside_the_script | path join "template.html" | path exists) {
+        $beside_the_script
+    } else {
+        $nu.home-dir | path join ".local" "share" "mdpdf"
+    }
+}
+
 # Convert a Markdown file to a PDF.
 #
 # The PDF is written next to the Markdown file, with the same name and a .pdf
-# extension. Pass --output to write it somewhere else.
+# extension. Pass --output to write it somewhere else. The PDF uses GitHub's
+# Markdown styling.
 def main [
     markdown: string, # Path to the Markdown file
     --output (-o): string, # PDF path (default: the Markdown path with a .pdf extension)
@@ -26,7 +38,13 @@ def main [
     }
 
     require-command "pandoc"
-    require-command "typst"
+    require-command "weasyprint"
+
+    let style = (style-directory)
+    let template = ($style | path join "template.html")
+    if not ($template | path exists) {
+        error make {msg: "mdpdf style files are missing. Run install-applications.nu to install them."}
+    }
 
     let pdf = if $output == null {
         pdf-alongside $markdown
@@ -39,6 +57,20 @@ def main [
         mkdir $parent
     }
 
-    ^pandoc $markdown --pdf-engine=typst --output $pdf
+    let resource_directory = ($markdown | path expand | path dirname)
+    ^pandoc ...(
+        [
+            $markdown
+            "--from=gfm"
+            "--pdf-engine=weasyprint"
+            "--pdf-engine-opt=-q"
+            $"--template=($template)"
+            $"--css=($style | path join 'github-markdown-light.css')"
+            $"--css=($style | path join 'page.css')"
+            $"--syntax-highlighting=($style | path join 'highlight.theme')"
+            $"--resource-path=($resource_directory)"
+            $"--output=($pdf)"
+        ]
+    )
     print $pdf
 }

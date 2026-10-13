@@ -22,8 +22,8 @@ The point of two separate scripts is such that deployment of configurations can 
 
 - Bootstrap tools: Nushell, Charm, Glow, Gum, and VHS.
 - Herdr: terminal workspace manager for AI coding agents, with a Cursor skill generated from `herdr --skill`.
-- Development tools: Ansible linting and language-server support, Git, Python, Node.js/npm, SQLite, Tree-sitter CLI, jq, yamlfmt, mdformat, yamllint, shellcheck, Marksman, Odin, OLS, odinfmt, Rust, rust-analyzer, rust-src, pandoc, Typst, and curl.
-- `mdpdf`: converts a Markdown file to a PDF of the same name, using pandoc with the Typst PDF engine. `mdpdf notes.md` writes `notes.pdf` beside the source, and `mdpdf notes.md --output out/notes.pdf` writes the PDF somewhere else.
+- Development tools: Ansible linting and language-server support, Git, Python, Node.js/npm, SQLite, Tree-sitter CLI, jq, yamlfmt, mdformat, yamllint, shellcheck, Marksman, Odin, OLS, odinfmt, Rust, rust-analyzer, rust-src, pandoc, WeasyPrint, and curl.
+- `mdpdf`: converts a Markdown file to a PDF of the same name. Pandoc reads it as GitHub-flavored Markdown and WeasyPrint renders it with GitHub's Markdown stylesheet. `mdpdf notes.md` writes `notes.pdf` beside the source, and `mdpdf notes.md --output out/notes.pdf` writes the PDF somewhere else.
 - Neovim: the pacman `neovim` and `omarchy-nvim` packages are removed, and the official GitHub nightly tarball is installed to `/opt/neovim`.
 - Topiary: the official GitHub release is installed to `~/.local/share/topiary`, with `topiary-nushell` queries cloned to `~/.local/share/topiary-nushell` and deployed to `~/.config/topiary`. It formats Nushell, Bash, JSON, and TOML.
 - Microsandbox: the official GitHub release is installed to `~/.microsandbox`, with `msb` and `microsandbox` linked in `~/.local/bin`. Local sandboxes require KVM.
