@@ -1,0 +1,1 @@
+alias mdv = md-viewer
