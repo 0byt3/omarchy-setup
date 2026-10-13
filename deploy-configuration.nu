@@ -173,6 +173,18 @@ def deploy-topiary-nushell [] {
     }
 }
 
+def append-bashrc-source [bashrc comment source_line] {
+    let bashrc_text = (open --raw $bashrc)
+    if not ($bashrc_text | str contains $source_line) {
+        let prefix = if ($bashrc_text | str ends-with (char newline)) {
+            $bashrc_text
+        } else {
+            $"($bashrc_text)(char newline)"
+        }
+        $"($prefix)(char newline)# ($comment)(char newline)($source_line)(char newline)" | save --force $bashrc
+    }
+}
+
 def deploy-bash-prompt [] {
     let source = ($repository_directory | path join "bash" "prompt.bash")
     let destination = ($env.HOME | path join ".config" "basic-cli" "prompt.bash")
@@ -191,16 +203,39 @@ def deploy-bash-prompt [] {
 
     mkdir ($destination | path dirname)
     ^cp --archive $source $destination
+    append-bashrc-source $bashrc "basic-cli prompt" $source_line
 
-    let bashrc_text = (open --raw $bashrc)
-    if not ($bashrc_text | str contains $source_line) {
-        let prefix = if ($bashrc_text | str ends-with (char newline)) {
-            $bashrc_text
-        } else {
-            $"($bashrc_text)(char newline)"
+    [
+        {
+            source: $source
+            destination: $destination
         }
-        $"($prefix)(char newline)# basic-cli prompt(char newline)($source_line)(char newline)" | save --force $bashrc
+        {
+            source: $source
+            destination: $bashrc
+        }
+    ]
+}
+
+def deploy-bash-aliases [] {
+    let source = ($repository_directory | path join "bash" "aliases.bash")
+    let destination = ($env.HOME | path join ".config" "basic-cli" "aliases.bash")
+    let bashrc = ($env.HOME | path join ".bashrc")
+    let source_line = 'source "$HOME/.config/basic-cli/aliases.bash"'
+
+    if not ($source | path exists) {
+        print "Skipped bash alias deployment because the alias source is missing."
+        return null
     }
+
+    if not ($bashrc | path exists) {
+        print "Skipped bash alias deployment because ~/.bashrc is missing."
+        return null
+    }
+
+    mkdir ($destination | path dirname)
+    ^cp --archive $source $destination
+    append-bashrc-source $bashrc "basic-cli aliases" $source_line
 
     [
         {
@@ -322,6 +357,10 @@ def main [
             source: ($repository_directory | path join "cheatsheet")
             destination: ($env.HOME | path join ".config" "cheatsheet")
         }
+        {
+            source: ($repository_directory | path join "nushell")
+            destination: ($env.HOME | path join ".config" "nushell")
+        }
     ]
 
     for configuration in $configuration_plan {
@@ -338,6 +377,7 @@ def main [
 
     let herdr_skill = (deploy-herdr-skill)
     let bash_prompt = (deploy-bash-prompt)
+    let bash_aliases = (deploy-bash-aliases)
     let blesh = (deploy-blesh)
     let neovim_plugins = (deploy-neovim-plugins --no-git=$no_git)
     let topiary_nushell = (deploy-topiary-nushell)
@@ -351,6 +391,7 @@ def main [
         )
         ++ $neovim_plugins
         ++ (if $bash_prompt == null { [] } else { $bash_prompt })
+        ++ (if $bash_aliases == null { [] } else { $bash_aliases })
         ++ (if $blesh == null { [] } else { $blesh })
         ++ (if $topiary_nushell == null { [] } else { [$topiary_nushell] })
         ++ [$odinfmt_home]
