@@ -890,6 +890,12 @@ def deploy-mvm [] {
     ^install --mode=0755 ($repository_directory | path join "bin" "mvm") $destination
 }
 
+def deploy-mdpdf [] {
+    let destination = ($env.HOME | path join ".local" "bin" "mdpdf")
+    mkdir ($destination | path dirname)
+    ^install --mode=0755 ($repository_directory | path join "bin" "mdpdf") $destination
+}
+
 def deploy-onedrive-plugin [] {
     let plugin_source = ($repository_directory | path join "omarchy" "plugins" "eag-erolleman.onedrive")
     let plugin_destination = ($env.HOME | path join ".config" "omarchy" "plugins" "eag-erolleman.onedrive")
@@ -1258,6 +1264,7 @@ def main [--yes] {
         { package: "marksman", source: "pkg" }
         { package: "mdformat", source: "pkg" }
         { package: "mdformat-tables", source: "pkg" }
+        { package: "pandoc-cli", source: "pkg" }
         { package: "nodejs", source: "pkg" }
         { package: "npm", source: "pkg" }
         { package: "odin", source: "pkg" }
@@ -1272,6 +1279,7 @@ def main [--yes] {
         { package: "shellcheck", source: "pkg" }
         { package: "sqlite", source: "pkg" }
         { package: "tree-sitter-cli", source: "pkg" }
+        { package: "typst", source: "pkg" }
         { package: "yamlfmt", source: "pkg" }
         { package: "yamllint", source: "pkg" }
         { package: "Microsoft.Graph", source: "PSGallery" }
@@ -1367,6 +1375,7 @@ def main [--yes] {
 
     print "The pgAdmin command will be installed."
     print "The mvm command will be installed."
+    print "The mdpdf command will be installed."
     print "The OneDrive client will be checked for updates."
     print "The MCP servers will be checked for updates."
     print "The topiary-nushell queries will be checked for updates."
@@ -1440,6 +1449,7 @@ def main [--yes] {
 
     deploy-pgadmin-scripts
     deploy-mvm
+    deploy-mdpdf
 
     let onedrive_source_changed = (update-onedrive-source)
     if ($onedrive_source_changed or not ("/usr/local/bin/onedrive" | path exists)) {
