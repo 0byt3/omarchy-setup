@@ -1,0 +1,44 @@
+#!/usr/bin/env nu
+
+def pdf-alongside [markdown: string]: nothing -> string {
+    $markdown | path parse | update extension "pdf" | path join
+}
+
+def require-command [name: string] {
+    if (which $name | is-empty) {
+        error make {msg: $"($name) is not installed. Run install-applications.nu to install it."}
+    }
+}
+
+# Convert a Markdown file to a PDF.
+#
+# The PDF is written next to the Markdown file, with the same name and a .pdf
+# extension. Pass --output to write it somewhere else.
+def main [
+    markdown: string, # Path to the Markdown file
+    --output (-o): string, # PDF path (default: the Markdown path with a .pdf extension)
+] {
+    if not ($markdown | path exists) {
+        error make {msg: $"($markdown) does not exist."}
+    }
+    if ($markdown | path type) != "file" {
+        error make {msg: $"($markdown) is not a file."}
+    }
+
+    require-command "pandoc"
+    require-command "typst"
+
+    let pdf = if $output == null {
+        pdf-alongside $markdown
+    } else {
+        $output
+    }
+
+    let parent = ($pdf | path dirname)
+    if ($parent | is-not-empty) {
+        mkdir $parent
+    }
+
+    ^pandoc $markdown --pdf-engine=typst --output $pdf
+    print $pdf
+}
