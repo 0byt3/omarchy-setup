@@ -28,10 +28,12 @@ def powershell-architecture [] {
 }
 
 def installed-powershell-version [] {
-    (^/usr/local/bin/pwsh --version
+    (
+        ^/usr/local/bin/pwsh --version
         | str trim
         | str replace "PowerShell " ""
-        | into semver)
+        | into semver
+    )
 }
 
 def latest-powershell-release [] {
@@ -199,7 +201,7 @@ def pacman-packages-to-drop [] {
 }
 
 def installed-packages-to-drop [installed_packages] {
-    pacman-packages-to-drop | where {|package| $package in $installed_packages}
+    pacman-packages-to-drop | where {|package| $package in $installed_packages }
 }
 
 def latest-neovim-nightly-release [] {
@@ -384,7 +386,7 @@ def install-topiary [release] {
     let installed_binaries = (
         glob $"($install_directory)/**/*"
         | where {|path|
-            ($path | path type) == "file" and (($path | path basename) in ["topiary", "topiary-cli"])
+            ($path | path type) == "file" and (($path | path basename) in ["topiary" "topiary-cli"])
         }
     )
     if ($installed_binaries | is-empty) {
@@ -768,7 +770,7 @@ def installed-powershell-gallery-modules [] {
 }
 
 def install-powershell-gallery-modules [modules] {
-    let module_names = ($modules | each {|module| $"'($module)'"} | str join ", ")
+    let module_names = ($modules | each {|module| $"'($module)'" } | str join ", ")
     let command = (
         [
             '$ErrorActionPreference = "Stop"'
@@ -815,7 +817,7 @@ def onedrive-fallback-version [source_directory] {
         ^git -C $source_directory ls-remote --tags --refs origin
         | lines
         | parse "{sha}\trefs/tags/{tag}"
-        | where {|row| $row.tag =~ '^v[0-9]'}
+        | where {|row| $row.tag =~ '^v[0-9]' }
         | each {|row|
             try {
                 $row | insert version ($row.tag | str replace -r '^v' '' | into semver)
@@ -823,7 +825,7 @@ def onedrive-fallback-version [source_directory] {
                 null
             }
         }
-        | where {|row| $row != null}
+        | where {|row| $row != null }
     )
 
     if ($tags | is-empty) {
@@ -968,6 +970,12 @@ def deploy-onedrive-service [] {
         print "  /usr/local/bin/onedrive --confdir ~/.config/onedrive/eag-erolleman"
         print $"Then start it with: systemctl --user start ($onedrive_service_name)"
     }
+}
+
+def deploy-we-script [] {
+    let destination = ($env.HOME | path join ".local" "bin" "we")
+    mkdir ($destination | path dirname)
+    ^install --mode=0755 ($repository_directory | path join "bin" "we.nu") $destination
 }
 
 def mcp-source-directory [server_name] {
@@ -1166,7 +1174,7 @@ def installed-webapp-launcher-names [name] {
     let applications = (applications-directory)
 
     webapp-launcher-names $name
-    | where {|launcher| ($applications | path join $"($launcher).desktop") | path exists}
+    | where {|launcher| ($applications | path join $"($launcher).desktop") | path exists }
 }
 
 def webapp-is-installed [name] {
@@ -1241,7 +1249,7 @@ def install-webapp [webapp] {
 }
 
 def install-webapps [webapps] {
-    if ($webapps | any {|webapp| $webapp.exec | is-not-empty}) {
+    if ($webapps | any {|webapp| $webapp.exec | is-not-empty }) {
         mkdir (chromium-personal-profile-directory)
     }
 
@@ -1252,44 +1260,44 @@ def install-webapps [webapps] {
 
 def main [--yes] {
     let install_plan = [
-        { package: "ansible-lint", source: "pkg" }
-        { package: "ansible-language-server", source: "AUR" }
-        { package: "curl", source: "pkg" }
-        { package: "dbus", source: "pkg" }
-        { package: "discord", source: "pkg" }
-        { package: "git", source: "pkg" }
-        { package: "gtk3", source: "pkg" }
-        { package: "herdr", source: "pkg" }
-        { package: "jdk-openjdk", source: "pkg" }
-        { package: "jq", source: "pkg" }
-        { package: "ldc", source: "pkg" }
-        { package: "libnotify", source: "pkg" }
-        { package: "lua-language-server", source: "pkg" }
-        { package: "make", source: "pkg" }
-        { package: "marksman", source: "pkg" }
-        { package: "mdformat", source: "pkg" }
-        { package: "mdformat-tables", source: "pkg" }
-        { package: "pandoc-cli", source: "pkg" }
-        { package: "python-weasyprint", source: "pkg" }
-        { package: "nodejs", source: "pkg" }
-        { package: "npm", source: "pkg" }
-        { package: "odin", source: "pkg" }
-        { package: "odinfmt", source: "pkg" }
-        { package: "ols", source: "pkg" }
-        { package: "pkgconf", source: "pkg" }
-        { package: "pyright", source: "pkg" }
-        { package: "python", source: "pkg" }
-        { package: "rust", source: "pkg" }
-        { package: "rust-analyzer", source: "pkg" }
-        { package: "rust-src", source: "pkg" }
-        { package: "shellcheck", source: "pkg" }
-        { package: "sqlite", source: "pkg" }
-        { package: "tree-sitter-cli", source: "pkg" }
-        { package: "yamlfmt", source: "pkg" }
-        { package: "yamllint", source: "pkg" }
-        { package: "Microsoft.Graph", source: "PSGallery" }
-        { package: "Microsoft.Entra", source: "PSGallery" }
-        { package: "Microsoft.Graph.Intune", source: "PSGallery" }
+        {package: "ansible-lint" source: "pkg"}
+        {package: "ansible-language-server" source: "AUR"}
+        {package: "curl" source: "pkg"}
+        {package: "dbus" source: "pkg"}
+        {package: "discord" source: "pkg"}
+        {package: "git" source: "pkg"}
+        {package: "gtk3" source: "pkg"}
+        {package: "herdr" source: "pkg"}
+        {package: "jdk-openjdk" source: "pkg"}
+        {package: "jq" source: "pkg"}
+        {package: "ldc" source: "pkg"}
+        {package: "libnotify" source: "pkg"}
+        {package: "lua-language-server" source: "pkg"}
+        {package: "make" source: "pkg"}
+        {package: "marksman" source: "pkg"}
+        {package: "mdformat" source: "pkg"}
+        {package: "mdformat-tables" source: "pkg"}
+        {package: "pandoc-cli" source: "pkg"}
+        {package: "python-weasyprint" source: "pkg"}
+        {package: "nodejs" source: "pkg"}
+        {package: "npm" source: "pkg"}
+        {package: "odin" source: "pkg"}
+        {package: "odinfmt" source: "pkg"}
+        {package: "ols" source: "pkg"}
+        {package: "pkgconf" source: "pkg"}
+        {package: "pyright" source: "pkg"}
+        {package: "python" source: "pkg"}
+        {package: "rust" source: "pkg"}
+        {package: "rust-analyzer" source: "pkg"}
+        {package: "rust-src" source: "pkg"}
+        {package: "shellcheck" source: "pkg"}
+        {package: "sqlite" source: "pkg"}
+        {package: "tree-sitter-cli" source: "pkg"}
+        {package: "yamlfmt" source: "pkg"}
+        {package: "yamllint" source: "pkg"}
+        {package: "Microsoft.Graph" source: "PSGallery"}
+        {package: "Microsoft.Entra" source: "PSGallery"}
+        {package: "Microsoft.Graph.Intune" source: "PSGallery"}
     ]
 
     let installed_pacman_packages = (^pacman -Qq | lines)
@@ -1308,11 +1316,11 @@ def main [--yes] {
     let packages_to_drop = (installed-packages-to-drop $installed_pacman_packages)
     let missing_webapps = (
         webapp-install-plan
-        | where {|webapp| not (webapp-is-installed $webapp.name)}
+        | where {|webapp| not (webapp-is-installed $webapp.name) }
     )
     let webapps_to_remove = (
         webapp-remove-plan
-        | each {|name| installed-webapp-launcher-names $name}
+        | each {|name| installed-webapp-launcher-names $name }
         | flatten
     )
 
@@ -1465,6 +1473,7 @@ def main [--yes] {
     deploy-onedrive-plugin
     deploy-onedrive-service
     deploy-initdev
+    deploy-we-script
     update-topiary-nushell-source
 
     let unifi_mcp_source_changed = (update-mcp-source "unifi-mcp" $unifi_mcp_repository_url)
